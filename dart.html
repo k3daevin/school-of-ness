@@ -94,6 +94,12 @@
                     this.wuerfe.pop()
                 }
             }
+            get lastMultiplikator() {
+                if (this.wuerfe.length > 0) {
+                    return this.wuerfe.at(-1).multiplikator
+                }
+                return 0
+            }
             get isVoll() {
                 return this.wuerfe.length == 3
             }
@@ -117,6 +123,7 @@
             constructor(name) {
                 this.name = name
                 this.zuege = []
+                this.gewonnen = false
             }
             addZug(zug) {
                 this.zuege.push(zug)
@@ -143,16 +150,59 @@
                     this.spieler.push(new Spieler(spielername))
                 }
                 this.currentSpielerIndex = 0
-                this.points = 501
+                this.zug = new Zug()
+                this.points = 60
+                this.doubleOut = true
             }
             moveNext() {
+                this.currentSpieler.ueberworfen = false
                 this.currentSpielerIndex++
                 if (this.currentSpielerIndex >= this.spieler.length) {
+                    let gewonnen = false
+                    this.spieler.forEach(spieler => {
+                        if (spieler.gewonnen) {
+                            gewonnen = true
+                        }
+                        if (gewonnen) {
+                            alert('aus')
+                        }
+
+                    })
                     this.currentSpielerIndex = 0
                 }
+                this.zug = new Zug()
+            }
+            addZugToCurrentSpieler() {
+                this.currentSpieler.addZug(this.zug)
             }
             get currentSpieler() {
                 return this.spieler[this.currentSpielerIndex]
+            }
+            get currentSpielerPoints() {
+                return this.points - this.currentSpieler.wert - this.zug.wert
+            }
+            get currentSpielerGewonnen() {
+                const points = this.currentSpielerPoints
+                if (points != 0) return false;
+                if (this.doubleOut) {
+                    const lastMultiplikator = this.zug.lastMultiplikator
+                    if (lastMultiplikator != 2) return false
+                }
+                return true
+            }
+            get currentSpielerUeberworfen() {
+                const points = this.currentSpielerPoints
+                if (points == 1 || points < 0) {
+                    return true
+                }
+                return false
+            }
+            get nextAvailable() {
+                if (this.zug.isVoll) return true
+                if (this.currentSpielerUeberworfen) return true
+                if (this.currentSpielerGewonnen) return true
+                if (this.currentSpielerPoints == 0) return true
+                return false
             }
         }
         
@@ -171,6 +221,7 @@
                     <h3>{{ spieler.name }}</h3>
                     <h2>{{ game.points - spieler.wert }}</h2>
                     <p>{{ spieler.lastWurfDisplay }}</p>
+                    <p>Gewonnen: {{ spieler.gewonnen }}</p>
                 </div>
             </div>
         </div>
@@ -189,17 +240,17 @@
             </div>
         </div>
         <br>
-        <h2>{{ game.currentSpieler.name }}</h2>
+        <h2>{{ game.currentSpieler.name }}</h2><h3>{{ game.currentSpielerPoints }}</h3>
         <br>
         <div class="container">
             <div class="row">
-                <div class="col" v-for="wurf in zug.wuerfe">
+                <div class="col" v-for="wurf in game.zug.wuerfe">
                     {{ wurf.display }}
                 </div>
             </div>
             <div class="row">
                 <div class="col">
-                    <button class="btn btn-primary w-100 h-100" v-if="zug.isVoll" v-on:click="next()">Next</button>
+                    <button class="btn btn-primary w-100 h-100" v-if="game.nextAvailable" v-on:click="next()">Next</button>
                     <button class="btn btn-primary w-100 h-100" v-else disabled>Next</button>
                 </div>
             </div>
@@ -214,7 +265,6 @@
             el: '#app',
             data: {
                 message: 'Hello Vue!',
-                zug: new Zug(),
                 symbole: new Symbole(),
                 game: new Game(['kev', 'nessl', 'mani'])
             },
@@ -226,9 +276,14 @@
             },
             methods: {
                 next: function() {
-                    this.game.currentSpieler.addZug(this.zug)
+                    if (this.game.currentSpielerUeberworfen == false && this.game.currentSpielerPoints != 0) {
+                        this.game.addZugToCurrentSpieler()
+                    }
+                    if (this.game.currentSpielerGewonnen) {
+                        this.game.currentSpieler.gewonnen = true
+                        this.game.addZugToCurrentSpieler()
+                    }
                     this.game.moveNext()
-                    this.zug = new Zug()
                 },
                 klickSymbol: function(value) {
                     let s = this.symbole
@@ -239,23 +294,25 @@
                         s.double.highlight = false
                         s.tripple.highlight = !s.tripple.highlight
                     } else if (value == -1) {
-                        this.zug.removeWurf()
+                        this.game.zug.removeWurf()
                         s.double.highlight = false
                         s.tripple.highlight = false
                     } else {
+                        if (this.game.currentSpielerUeberworfen) {
+                            return
+                        }
+
                         let multiplikator = 1
                         if (s.double.highlight) {
                             multiplikator = 2
                         } else if (s.tripple.highlight) {
                             multiplikator = 3
                         }
-                        this.zug.addWurf(multiplikator, value)
+                        this.game.zug.addWurf(multiplikator, value)
                         s.double.highlight = false
-                        s.tripple.highlight = false
+                        s.tripple.highlight = false                        
                     }
 
-                    if (this.zug.isVoll) {
-                    }
                 }
             }
         })
